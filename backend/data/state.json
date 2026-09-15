@@ -1,0 +1,18 @@
+{
+  "tasks": [
+    {
+      "id": "885da5cb-a229-4214-9a2f-5d3dc7261aac",
+      "title": "GIT",
+      "description": "",
+      "status": "open",
+      "version": 1,
+      "updatedAt": "2026-09-15T18:11:35.905Z",
+      "syncStatus": "error",
+      "error": "GitHub is not configured. Set GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO.",
+      "conflict": null,
+      "providerId": null
+    }
+  ],
+  "events": [],
+  "cursor": null
+}
