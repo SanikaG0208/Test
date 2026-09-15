@@ -11,8 +11,36 @@
       "error": "GitHub is not configured. Set GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO.",
       "conflict": null,
       "providerId": null
+    },
+    {
+      "id": "e343042c-1a55-4eab-bbee-73be127de71a",
+      "title": "GitTask",
+      "description": "CHecking checking\n",
+      "status": "open",
+      "version": 2,
+      "updatedAt": "2026-09-15T18:39:59.499Z",
+      "syncStatus": "synced",
+      "error": null,
+      "conflict": null,
+      "providerId": "1",
+      "providerUpdatedAt": "2026-09-15T18:40:05Z",
+      "providerUrl": "https://github.com/SanikaG0208/Test/issues/1"
+    },
+    {
+      "id": "e833330b-e4ac-42ba-9cb4-89e7c33da4a7",
+      "providerId": "2",
+      "title": "git to app",
+      "description": "to check working crctly or not",
+      "status": "open",
+      "providerUpdatedAt": "2026-09-15T18:41:55Z",
+      "providerUrl": "https://github.com/SanikaG0208/Test/issues/2",
+      "version": 1,
+      "updatedAt": "2026-09-15T18:41:55Z",
+      "syncStatus": "synced",
+      "error": null,
+      "conflict": null
     }
   ],
   "events": [],
-  "cursor": null
+  "cursor": "2026-09-15T18:42:13.945Z"
 }
