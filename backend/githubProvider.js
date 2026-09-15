@@ -12,7 +12,7 @@ class GithubProvider {
   get configured() { return Boolean(this.token && this.owner && this.repo); }
 
   async request(path, options = {}, attempt = 0) {
-    if (!this.configured) throw new Error('GitHub is not configured. Set GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO.');
+    if (!this.configured) throw new Error('GitHub is not set up yet. Add GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO to the backend .env file.');
     const response = await this.fetch(`${API_ROOT}${path}`, { ...options, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(options.headers || {}) } });
     if ((response.status === 429 || response.status >= 500) && attempt < 5) {
       const retryAfter = Number(response.headers.get('retry-after')) || Math.min(30, 2 ** attempt);

@@ -12,7 +12,7 @@ async function createApp({ store = new Store(), provider = new GithubProvider() 
 
   app.use(cors());
   app.use(express.json());
-  app.get('/', (_req, res) => res.json({ message: 'Task Sync API is running', health: '/api/health' }));
+  app.get('/', (_req, res) => res.json({ message: 'Task Sync API is running.', health: '/api/health' }));
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', githubConfigured: provider.configured }));
   app.get('/api/tasks', (req, res) => {
     const search = String(req.query.search || '').toLowerCase();

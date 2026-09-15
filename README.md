@@ -1,41 +1,51 @@
-# Task Sync Console
+# Task Sync
 
-Task Sync Console is a small full-stack task manager that synchronizes with a real GitHub Issues repository. The backend is the source of truth for local task state and exposes REST endpoints consumed by the React dashboard.
+This app keeps a local task list in sync with GitHub Issues. You can create and edit tasks in the dashboard, then push those changes to GitHub. Changes made in GitHub can be pulled back into the app as well.
 
-## Run locally
+## Run it locally
 
-Requirements: Node 18+ and a GitHub personal access token with Issues read/write access.
+You need Node 18 or newer and a GitHub token that can read and write Issues in the repository you want to use.
 
 ```powershell
 cd backend
 copy .env.example .env
-# Set GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO in .env
+# Edit .env and fill in the GitHub values
 npm install
-node server.js
+npm start
+```
 
-# In another terminal
+In a second terminal:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-The API runs at `http://localhost:5000` and Vite at `http://localhost:5173`. The backend stores state in `backend/data/state.json`; it is atomically replaced after every mutation and should not be committed.
+Open `http://127.0.0.1:5173/` in a browser. The API runs on `http://localhost:5000` by default.
 
-## Architecture decisions
+The backend saves its local state to `backend/data/state.json`. That file is created at runtime and is ignored by Git.
 
-`GithubProvider` is the only module that knows GitHub's HTTP API. It sends authenticated requests, follows issue pages in batches of 100, filters pull requests, and retries 429/5xx responses with `Retry-After` or exponential backoff. A failed task is marked `error`, so one bad item does not stop the rest of the queue.
+## How it works
 
-`SyncEngine` owns the bidirectional workflow. Local create/edit operations enqueue a task as `pending`; `POST /api/sync` pushes pending tasks in order and then pulls all provider pages. The saved `cursor` is a checkpoint for the last completed pull and is retained across restarts. GitHub webhooks can call `POST /api/webhooks/github` with `X-GitHub-Delivery`.
+The GitHub API code lives in `backend/githubProvider.js`. It adds the access token to each request, reads Issues 100 at a time, ignores pull requests, and retries temporary 429 and 5xx responses. The retry delay uses GitHub's `Retry-After` header when it is available.
 
-## Conflict policy
+`backend/syncEngine.js` handles the actual sync work. A new or edited task is saved as `pending`. A sync pushes pending tasks first, then reads the provider pages and updates local tasks. The last completed pull time is saved as a cursor so the process can restart without losing its place.
 
-Conflicts use manual resolution. If a local task is pending and a newer provider version arrives, both versions are saved under `conflict`; the dashboard offers “Keep local” or “Keep GitHub”. This avoids silently losing a user edit, which is more important for task data than maximizing automatic throughput. A future field-level merge could merge title, description, and status independently, but would need a clear rule for incompatible edits.
+A task that repeatedly fails is marked `error`; it does not stop the other tasks from syncing. The dashboard shows that state instead of claiming the task is synced.
+
+## Conflict handling
+
+This project uses manual conflict resolution. When a local edit is still pending and GitHub has a different newer version, the task becomes `conflict`. The dashboard shows buttons for keeping the local version or using the GitHub version.
+
+Manual resolution is deliberate here. It prevents an edit from disappearing silently. A field-by-field merge would be a useful next step, but it would need rules for cases where both sides changed the same field.
 
 ## How I ensured sync correctness
 
-- **Race conditions:** every task has a monotonic `version`. PATCH and DELETE accept `If-Match`; a stale version gets HTTP 409 and the current task, so concurrent edits cannot overwrite each other silently. File writes are serialized and use a temporary file plus rename.
-- **Idempotency:** GitHub delivery IDs are persisted in `events`, so replayed webhooks return `duplicate: true` without changing state. Provider issue numbers are the stable external identity. App deletes create tombstones, preventing late webhooks from resurrecting a task.
-- **Retries:** transient 429 and 5xx provider responses retry up to five times with backoff. Permanent failures quarantine only the affected task as `error`. Sync can be run again after a process crash; pending tasks remain persisted and the last pull checkpoint remains visible.
+- **Concurrent edits:** each task has a version number. PATCH and DELETE requests can include `If-Match`; an old version receives HTTP 409 instead of overwriting a newer edit. State writes are queued and written through a temporary file before the file is replaced.
+- **Duplicate events:** GitHub delivery IDs are stored in `events`. Receiving the same webhook again returns `duplicate: true` and does not apply the event twice. GitHub issue numbers are used as the stable provider ID.
+- **Deleted tasks:** a local delete leaves a tombstone. A late webhook for that issue is ignored, so an old event cannot bring the task back.
+- **Retries:** temporary GitHub failures are retried up to five times. A permanent failure is recorded on that task and the rest of the queue can continue. Pending work remains on disk if the process stops.
 
 ## Tests
 
@@ -44,8 +54,8 @@ cd backend
 npm test
 ```
 
-Tests cover duplicate webhooks, deletion tombstones, optimistic concurrency, pagination, and transient provider failures.
+The tests cover duplicate webhooks, deleted-task tombstones, stale concurrent updates, pagination, and temporary provider failures.
 
-## Known limitations / what I'd do with more time
+## Known limitations
 
-The demo uses a JSON store rather than Postgres, so it is designed for one API process and does not provide database-level transactions across multiple instances. GitHub webhook signature verification and a background job process with durable leases should be added before production. Pull currently scans all issue pages after the checkpoint; I would use GitHub's event API or conditional requests for a more efficient incremental cursor. The provider needs a repository label/metadata mapping for richer task fields and the frontend would benefit from real-time push updates.
+The local store is a JSON file, so this setup is intended for one backend process. A production version should use a database and a job queue with leases. Webhook signature verification should also be added before exposing the webhook endpoint publicly. The current pull checks all GitHub issue pages; using GitHub events or conditional requests would make large repositories more efficient.
