@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('node:crypto');
 require("dotenv").config();
 const { Store } = require('./store');
 const { GithubProvider } = require('./githubProvider');
@@ -11,7 +12,7 @@ async function createApp({ store = new Store(), provider = new GithubProvider() 
   const app = express();
 
   app.use(cors());
-  app.use(express.json());
+  app.use(express.json({ verify: (req, _res, buffer) => { req.rawBody = buffer; } }));
   app.get('/', (_req, res) => res.json({ message: 'Task Sync API is running.', health: '/api/health' }));
   app.get('/api/health', (_req, res) => res.json({ status: 'ok', githubConfigured: provider.configured }));
   app.get('/api/tasks', (req, res) => {
@@ -31,7 +32,16 @@ async function createApp({ store = new Store(), provider = new GithubProvider() 
   });
   app.post('/api/sync', async (_req, res) => { try { await sync.pushPending(); await sync.pull(); res.json({ ok: true, cursor: store.state.cursor }); } catch (error) { res.status(502).json({ error: error.message }); } });
   app.post('/api/tasks/:id/resolve', async (req, res) => res.json(await sync.resolveConflict(req.params.id, req.body.choice)));
-  app.post('/api/webhooks/github', async (req, res) => { try { res.json(await sync.webhook(req.get('X-GitHub-Delivery'), req.body)); } catch (error) { res.status(400).json({ error: error.message }); } });
+  app.post('/api/webhooks/github', async (req, res) => {
+    try {
+      const secret = process.env.GITHUB_WEBHOOK_SECRET;
+      const signature = req.get('X-Hub-Signature-256');
+      if (!secret || !signature) return res.status(401).json({ error: 'Webhook signing is not configured.' });
+      const expected = `sha256=${crypto.createHmac('sha256', secret).update(req.rawBody || '').digest('hex')}`;
+      if (signature.length !== expected.length || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return res.status(401).json({ error: 'Webhook signature is invalid.' });
+      res.json(await sync.webhook(req.get('X-GitHub-Delivery'), req.body));
+    } catch (error) { res.status(400).json({ error: error.message }); }
+  });
   return app;
 }
 

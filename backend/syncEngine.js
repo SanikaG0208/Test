@@ -34,14 +34,27 @@ class SyncEngine {
     } catch (error) { await this.store.update(() => Object.assign(task, { syncStatus: 'error', error: error.message })); }
   }
 
+  async processDeletedTask(task) {
+    try {
+      if (task.providerId) await this.provider.deleteIssue(task.providerId);
+      await this.store.update(() => Object.assign(task, { syncStatus: 'deleted', error: null }));
+    } catch (error) { await this.store.update(() => Object.assign(task, { syncStatus: 'error', error: error.message })); }
+  }
+
   async pushPending() {
     if (this.running) return;
     this.running = true;
-    try { for (const task of this.store.pending()) await this.processTask(task); } finally { this.running = false; }
+    try {
+      for (const task of this.store.pending()) await this.processTask(task);
+      for (const task of this.store.state.tasks.filter((item) => item.syncStatus === 'deleted' && item.providerId && !item.deleteSyncedAt)) {
+        await this.processDeletedTask(task);
+        if (task.syncStatus === 'deleted') { task.deleteSyncedAt = now(); await this.store.save(); }
+      }
+    } finally { this.running = false; }
   }
 
   async pull() {
-    const remoteIssues = await this.provider.listIssues();
+    const remoteIssues = await this.provider.listIssues(this.store.state.cursor);
     await this.store.update((state) => {
       for (const issue of remoteIssues) {
         const remote = normalizeIssue(issue);

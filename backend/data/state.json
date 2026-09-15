@@ -3,14 +3,16 @@
     {
       "id": "885da5cb-a229-4214-9a2f-5d3dc7261aac",
       "title": "GIT",
-      "description": "",
+      "description": "First but cause of some reason not done",
       "status": "open",
-      "version": 1,
-      "updatedAt": "2026-09-15T18:11:35.905Z",
-      "syncStatus": "error",
-      "error": "GitHub is not configured. Set GITHUB_TOKEN, GITHUB_OWNER and GITHUB_REPO.",
+      "version": 3,
+      "updatedAt": "2026-09-15T23:47:15Z",
+      "syncStatus": "synced",
+      "error": null,
       "conflict": null,
-      "providerId": null
+      "providerId": "3",
+      "providerUpdatedAt": "2026-09-15T23:47:15Z",
+      "providerUrl": "https://github.com/SanikaG0208/Test/issues/3"
     },
     {
       "id": "e343042c-1a55-4eab-bbee-73be127de71a",
@@ -39,8 +41,27 @@
       "syncStatus": "synced",
       "error": null,
       "conflict": null
+    },
+    {
+      "id": "47796152-b1e6-4d99-8d0d-2450e1b0ead6",
+      "title": "TO do tasks",
+      "description": "Bappa darshan done",
+      "status": "open",
+      "version": 2,
+      "updatedAt": "2026-09-15T23:48:40Z",
+      "syncStatus": "synced",
+      "error": null,
+      "conflict": null,
+      "providerId": "4",
+      "providerUpdatedAt": "2026-09-15T23:48:40Z",
+      "providerUrl": "https://github.com/SanikaG0208/Test/issues/4"
     }
   ],
-  "events": [],
-  "cursor": "2026-09-15T18:42:13.945Z"
+  "events": [
+    "31347544-b15f-11f1-87bc-f50bf983f0db",
+    "649fc1ea-b15f-11f1-9de3-7d2df25a760b",
+    "c81fa3b6-b15f-11f1-99bc-a15d305dbd45",
+    "fb2725c2-b15f-11f1-87b4-412447ec7352"
+  ],
+  "cursor": "2026-09-15T23:48:42.193Z"
 }
