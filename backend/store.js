@@ -29,6 +29,8 @@ class Store {
   task(id) { return this.state.tasks.find((task) => task.id === id); }
   providerTask(providerId) { return this.state.tasks.find((task) => task.providerId === String(providerId)); }
   pending() { return this.state.tasks.filter((task) => ['pending', 'error'].includes(task.syncStatus)); }
+  async tryAcquireSyncLock() { return null; }
+  async releaseSyncLock() {}
 }
 
 module.exports = { Store };

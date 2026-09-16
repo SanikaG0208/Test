@@ -162,6 +162,6 @@ The screenshot shows the running dashboard with task counts, Sync now, task crea
 
 ## Known limitations
 
-The PostgreSQL store keeps an in-memory snapshot for the existing sync engine and persists normalized records in one transaction. The current `running` guard prevents duplicate sync jobs within one backend process; a deployment with multiple backend workers should add row-level job leases or a transactional outbox so workers coordinate across processes. The current pull uses GitHub's `since` filter but still needs to scan each changed page; using GitHub events or conditional requests would make large repositories more efficient.
+The PostgreSQL store keeps an in-memory snapshot for the existing sync engine and persists normalized records in one transaction. `pushPending()` uses a PostgreSQL advisory lock, so separate backend processes cannot process the sync queue at the same time; the in-process `running` guard handles re-entry within one process. The current pull uses GitHub's `since` filter but still needs to scan each changed page; using GitHub events or conditional requests would make large repositories more efficient.
 
 With more time, I would add PostgreSQL integration tests in CI, worker leases for multi-process queue consumers, API pagination for very large local task lists, authentication for dashboard users, structured logging/metrics, and field-level conflict merging. The current design is intentionally explicit about these boundaries rather than claiming multi-worker guarantees it does not provide.

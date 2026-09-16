@@ -206,3 +206,15 @@ test('state and sync cursor survive a restart', async () => {
   assert.equal(restartedStore.state.cursor !== null, true);
   assert.equal(restartedStore.pending().length, 1);
 });
+
+test('sync uses a cross-process lock boundary when the store provides one', async () => {
+  let acquired = 0;
+  let released = 0;
+  const { store } = await fixture({});
+  store.tryAcquireSyncLock = async () => { acquired += 1; return true; };
+  store.releaseSyncLock = async () => { released += 1; };
+  const sync = new SyncEngine(store, { listIssues: async () => [] });
+  await sync.pushPending();
+  assert.equal(acquired, 1);
+  assert.equal(released, 1);
+});

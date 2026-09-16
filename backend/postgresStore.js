@@ -9,6 +9,7 @@ class PostgresStore {
     this.pool = new Pool({ connectionString, max: Number(process.env.DB_POOL_MAX || 10) });
     this.state = structuredClone(EMPTY_STATE);
     this.writeQueue = Promise.resolve();
+    this.lockClient = null;
   }
 
   async init() {
@@ -56,7 +57,21 @@ class PostgresStore {
   providerTask(providerId) { return this.state.tasks.find((task) => task.providerId === String(providerId)); }
   pending() { return this.state.tasks.filter((task) => ['pending', 'error'].includes(task.syncStatus)); }
 
-  async close() { await this.pool.end(); }
+  async tryAcquireSyncLock() {
+    if (this.lockClient) return false;
+    const client = await this.pool.connect();
+    const result = await client.query('SELECT pg_try_advisory_lock($1) AS acquired', [48372619]);
+    if (!result.rows[0].acquired) { client.release(); return false; }
+    this.lockClient = client;
+    return true;
+  }
+
+  async releaseSyncLock() {
+    if (!this.lockClient) return;
+    try { await this.lockClient.query('SELECT pg_advisory_unlock($1)', [48372619]); } finally { this.lockClient.release(); this.lockClient = null; }
+  }
+
+  async close() { await this.releaseSyncLock(); await this.pool.end(); }
 }
 
 module.exports = { PostgresStore };

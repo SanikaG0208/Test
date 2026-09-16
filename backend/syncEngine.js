@@ -48,6 +48,8 @@ class SyncEngine {
 
   async pushPending() {
     if (this.running) return;
+    const lockAcquired = await this.store.tryAcquireSyncLock();
+    if (lockAcquired === false) return;
     this.running = true;
     try {
       for (const task of this.store.pending()) await this.processTask(task);
@@ -55,7 +57,7 @@ class SyncEngine {
         await this.processDeletedTask(task);
         if (task.syncStatus === 'deleted') { task.deleteSyncedAt = now(); await this.store.save(); }
       }
-    } finally { this.running = false; }
+    } finally { this.running = false; await this.store.releaseSyncLock(); }
   }
 
   async pull() {
