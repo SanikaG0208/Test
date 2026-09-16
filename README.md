@@ -24,6 +24,17 @@ npm run dev
 
 Open `http://127.0.0.1:5173/` in a browser. The API runs on `http://localhost:5000` by default.
 
+### One-command setup
+
+On Windows, install Node.js 18+ and PostgreSQL first, then run PowerShell from the repository root:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup.ps1
+```
+
+The script installs backend and frontend dependencies, creates `backend/.env` from the example when needed, verifies PostgreSQL, and opens the backend and frontend in separate PowerShell windows. Fill in `backend/.env` when prompted. It does not install PostgreSQL itself because PostgreSQL requires a system installer and password setup.
+
 For webhooks, create a GitHub webhook for `/api/webhooks/github`, choose `application/json`, and use the same random value as `GITHUB_WEBHOOK_SECRET` in `.env`. The endpoint accepts only GitHub requests with a valid `X-Hub-Signature-256` header.
 
 The backend uses PostgreSQL when `DATABASE_URL` is configured. It creates the `task_sync_state` table on startup. The file-backed store remains available for isolated unit tests when no database URL is provided.
