@@ -14,16 +14,20 @@ class SyncEngine {
   async updateTask(id, input, expectedVersion) {
     const task = this.store.task(id);
     if (!task) return null;
-    if (expectedVersion !== undefined && Number(expectedVersion) !== task.version) { const error = new Error('Task changed since it was loaded'); error.status = 409; error.task = task; throw error; }
-    await this.store.update(() => { Object.assign(task, { title: input.title ?? task.title, description: input.description ?? task.description, status: input.status ?? task.status, version: task.version + 1, updatedAt: now(), syncStatus: 'pending', error: null }); });
+    await this.store.update(() => {
+      if (expectedVersion !== undefined && Number(expectedVersion) !== task.version) { const error = new Error('Task changed since it was loaded'); error.status = 409; error.task = task; throw error; }
+      Object.assign(task, { title: input.title ?? task.title, description: input.description ?? task.description, status: input.status ?? task.status, version: task.version + 1, updatedAt: now(), syncStatus: 'pending', error: null });
+    });
     return task;
   }
 
   async deleteTask(id, expectedVersion) {
     const task = this.store.task(id);
     if (!task) return null;
-    if (expectedVersion !== undefined && Number(expectedVersion) !== task.version) { const error = new Error('Task changed since it was loaded'); error.status = 409; error.task = task; throw error; }
-    await this.store.update(() => Object.assign(task, { deletedAt: now(), syncStatus: 'deleted', version: task.version + 1, updatedAt: now() }));
+    await this.store.update(() => {
+      if (expectedVersion !== undefined && Number(expectedVersion) !== task.version) { const error = new Error('Task changed since it was loaded'); error.status = 409; error.task = task; throw error; }
+      Object.assign(task, { deletedAt: now(), syncStatus: 'deleted', version: task.version + 1, updatedAt: now() });
+    });
     return task;
   }
 
@@ -84,6 +88,7 @@ class SyncEngine {
     if (!deliveryId) throw new Error('Missing X-GitHub-Delivery header');
     if (this.store.state.events.includes(deliveryId)) return { duplicate: true };
     await this.store.update((state) => state.events.push(deliveryId));
+    if (!payload.issue) return { duplicate: false, ignored: true };
     const issue = normalizeIssue(payload.issue);
     const local = this.store.providerTask(issue.providerId);
     if (!local) await this.store.update((state) => state.tasks.push({ id: crypto.randomUUID(), ...issue, version: 1, updatedAt: issue.providerUpdatedAt, syncStatus: 'synced', error: null, conflict: null }));

@@ -3,10 +3,11 @@ const cors = require('cors');
 const crypto = require('node:crypto');
 require("dotenv").config();
 const { Store } = require('./store');
+const { PostgresStore } = require('./postgresStore');
 const { GithubProvider } = require('./githubProvider');
 const { SyncEngine } = require('./syncEngine');
 
-async function createApp({ store = new Store(), provider = new GithubProvider() } = {}) {
+async function createApp({ store = process.env.DATABASE_URL ? new PostgresStore() : new Store(), provider = new GithubProvider() } = {}) {
   await store.init();
   const sync = new SyncEngine(store, provider);
   const app = express();

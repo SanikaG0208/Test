@@ -28,7 +28,7 @@ class Store {
   async update(mutator) { const result = await mutator(this.state); await this.save(); return result; }
   task(id) { return this.state.tasks.find((task) => task.id === id); }
   providerTask(providerId) { return this.state.tasks.find((task) => task.providerId === String(providerId)); }
-  pending() { return this.state.tasks.filter((task) => task.syncStatus === 'pending'); }
+  pending() { return this.state.tasks.filter((task) => ['pending', 'error'].includes(task.syncStatus)); }
 }
 
 module.exports = { Store };

@@ -13,7 +13,14 @@ class GithubProvider {
 
   async request(path, options = {}, attempt = 0) {
     if (!this.configured) throw new Error('GitHub is not set up yet. Add GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO to the backend .env file.');
-    const response = await this.fetch(`${API_ROOT}${path}`, { ...options, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(options.headers || {}) } });
+    let response;
+    try {
+      response = await this.fetch(`${API_ROOT}${path}`, { ...options, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(options.headers || {}) } });
+    } catch (error) {
+      if (attempt >= 5) throw error;
+      await this.sleep(Math.min(30000, 2 ** attempt * 1000));
+      return this.request(path, options, attempt + 1);
+    }
     const rateLimited = response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0');
     if ((rateLimited || response.status >= 500) && attempt < 5) {
       const resetAt = Number(response.headers.get('x-ratelimit-reset'));

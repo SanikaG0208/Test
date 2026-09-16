@@ -103,3 +103,22 @@ test('delete propagation closes the provider issue', async () => {
   assert.match(request.url, /issues\/7$/);
   assert.equal(JSON.parse(request.options.body).state, 'closed');
 });
+
+test('provider retries transient network failures', async () => {
+  let calls = 0;
+  let waited = 0;
+  const provider = new GithubProvider({ token: 't', owner: 'o', repo: 'r', sleep: async (ms) => { waited = ms; }, fetchImpl: async () => {
+    calls += 1;
+    if (calls === 1) throw new Error('network timeout');
+    return { status: 200, ok: true, headers: { get: () => null }, json: async () => [] };
+  } });
+  await provider.listIssues();
+  assert.equal(calls, 2);
+  assert.equal(waited > 0, true);
+});
+
+test('ping webhook is accepted without an issue payload', async () => {
+  const { store, sync } = await fixture({});
+  assert.deepEqual(await sync.webhook('ping-1', { zen: 'Keep it logically awesome.' }), { duplicate: false, ignored: true });
+  assert.equal(store.state.tasks.length, 0);
+});
