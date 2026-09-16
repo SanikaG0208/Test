@@ -2,7 +2,27 @@
 
 Task Sync is a React/Vite dashboard and Node.js/Express API that keeps application tasks bidirectionally synchronized with GitHub Issues. PostgreSQL stores durable task, queue, webhook, conflict, and cursor data.
 
-## Architecture overview
+## 1. Project Overview
+
+The application lets users manage tasks from a dashboard or GitHub Issues while preserving sync state, conflicts, retries, and recovery information.
+
+## 2. Features
+
+- Task CRUD, search, sync-status filtering, and manual Sync now
+- Bidirectional GitHub Issues synchronization with signed webhooks
+- Pagination, rate-limit handling, retries, timeouts, and crash recovery
+- Optimistic locking and manual conflict resolution
+- PostgreSQL migrations and durable queue/event/checkpoint storage
+
+## 3. Tech Stack
+
+- React and Vite
+- Node.js and Express
+- PostgreSQL and the `pg` driver
+- GitHub REST API and GitHub Webhooks
+- PowerShell setup script
+
+## 4. Architecture
 
 ```text
 React/Vite dashboard
@@ -22,7 +42,7 @@ PostgreSQL (tasks, sync events, jobs, conflicts, cursor)
 - `backend/postgresStore.js` persists the in-memory engine snapshot to normalized PostgreSQL tables in one transaction.
 - `backend/db/migrations/` contains ordered, repeatable database migrations.
 
-## Database schema
+## 5. Database Schema
 
 - `tasks`: local task fields, version, timestamps, provider issue number/metadata, sync status, errors, and deletion tombstones.
 - `sync_events`: processed `X-GitHub-Delivery` IDs used for webhook idempotency.
@@ -33,7 +53,7 @@ PostgreSQL (tasks, sync events, jobs, conflicts, cursor)
 
 The migration runner creates these tables on startup. Run it directly with `npm run migrate`.
 
-## Run it locally
+## 6. Setup Instructions
 
 You need Node 18 or newer, PostgreSQL 14 or newer, and a GitHub personal access token with permission to read and write Issues in the repository you want to use.
 
@@ -55,7 +75,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173/` in a browser. The API runs on `http://localhost:5000` by default.
 
-### Environment variables
+## 7. Environment Variables
 
 Copy `backend/.env.example` to `backend/.env`, then replace the placeholders. Never commit `backend/.env`.
 
@@ -72,7 +92,11 @@ Copy `backend/.env.example` to `backend/.env`, then replace the placeholders. Ne
 
 For a local webhook, expose the backend with `ngrok http 5000` and configure `https://<ngrok-host>/api/webhooks/github` in GitHub. Select `application/json`, enable SSL verification, and subscribe to **Issues** only.
 
-## Sync flow
+## 8. How to Run the Project
+
+The backend runs on `http://localhost:5000` and the frontend runs on `http://localhost:5173`.
+
+## 9. API Endpoints
 
 1. A task created or edited in the app is saved as `pending` with a version number.
 2. **Sync now** pushes pending tasks in order. New issues include a private task ID marker; existing tasks use the stored GitHub issue number.
@@ -81,18 +105,18 @@ For a local webhook, expose the backend with `ngrok http 5000` and configure `ht
 5. A provider change for an unknown issue creates one local task. A matching pending local edit becomes a conflict instead of being silently overwritten.
 6. Failed work is marked `error`, persisted, and retried on a later sync; one failed task does not stop the rest.
 
-## API surface
+ - `GET /api/health`
+ - `GET /api/tasks?search=<text>&status=<sync-status>`
+ - `GET /api/tasks/:id`
+ - `POST /api/tasks`
+ - `PATCH /api/tasks/:id` with optional `If-Match` version
+ - `DELETE /api/tasks/:id` with optional `If-Match` version
+ - `POST /api/sync`
+ - `GET /api/tasks/:id/conflict`
+ - `POST /api/tasks/:id/resolve` with `{ "choice": "local" | "remote" }`
+ - `POST /api/webhooks/github`
 
-- `GET /api/health`
-- `GET /api/tasks?search=<text>&status=<sync-status>`
-- `GET /api/tasks/:id`
-- `POST /api/tasks`
-- `PATCH /api/tasks/:id` with optional `If-Match` version
-- `DELETE /api/tasks/:id` with optional `If-Match` version
-- `POST /api/sync`
-- `GET /api/tasks/:id/conflict`
-- `POST /api/tasks/:id/resolve` with `{ "choice": "local" | "remote" }`
-- `POST /api/webhooks/github`
+## 10. Sync Flow
 
 ### One-command setup
 
@@ -117,7 +141,7 @@ The GitHub API code lives in `backend/githubProvider.js`. It adds the access tok
 
 A task that repeatedly fails is marked `error`; it does not stop the other tasks from syncing. The dashboard shows that state instead of claiming the task is synced. App deletes close the matching GitHub issue and keep a local tombstone so late events cannot recreate it.
 
-## Conflict handling
+## 11. Conflict Resolution Policy
 
 This project uses manual conflict resolution. When a local edit is still pending and GitHub has a different newer version, the task becomes `conflict`. Both versions are retained in `conflict.local` and `conflict.remote`, viewable through `GET /api/tasks/:id/conflict` and in the dashboard. The user can keep the local version, which is pushed to GitHub, or use the GitHub version, which is adopted locally. This avoids silently overwriting either side.
 
@@ -127,14 +151,18 @@ Manual resolution is deliberate here. It prevents an edit from disappearing sile
 
 There is no automatic winner when both sides changed during an offline window. The local and provider versions are shown together and the user chooses. Choosing **local** pushes the local version to GitHub; choosing **GitHub** adopts the provider version locally. This policy is slower than last-write-wins, but it avoids silently losing a user edit and makes the trade-off visible.
 
-## How I ensured sync correctness
+## 12. How I Ensured Sync Correctness
 
 - **Concurrent edits:** each task has a version number. PATCH and DELETE requests can include `If-Match`; an old version receives HTTP 409 instead of overwriting a newer edit. The concurrent update test proves that exactly one of two requests using the same version wins. State writes are queued and written through a temporary file before the file is replaced; PostgreSQL persistence uses a transaction.
 - **Duplicate events:** GitHub delivery IDs are stored in `events`. Receiving the same webhook again returns `duplicate: true` and does not apply the event twice. GitHub issue numbers are used as the stable provider ID.
 - **Deleted tasks:** a local delete leaves a tombstone. A late webhook for that issue is ignored, so an old event cannot bring the task back.
-- **Retries:** temporary provider and network failures are retried up to five times. A permanent failure is recorded on that task and the rest of the queue can continue; a later sync retries tasks in the `error` state. Pending work remains on disk if the process stops, and the pull checkpoint is sent to GitHub as a `since` filter on the next run.
+- **Retries:** temporary provider and network failures are retried up to five times with exponential backoff. A permanent failure is recorded on that task and the rest of the queue can continue; a later sync retries tasks in the `error` state. Pending work remains on disk if the process stops, and the pull checkpoint is sent to GitHub as a `since` filter on the next run.
 
-## Tests
+## 13. Retry and Rate Limit Handling
+
+GitHub `429`, rate-limit `403`, `5xx`, timeout, and network failures are retried up to five times. `Retry-After` and GitHub's reset timestamp are honored when available; otherwise the client uses capped exponential backoff.
+
+## 14. Testing
 
 ```powershell
 cd backend
@@ -146,7 +174,7 @@ npm.cmd run lint
 npm.cmd run build
 ```
 
-The 15 backend tests cover API CRUD/status codes, duplicate webhooks delivered three times, deleted-task tombstones, stale concurrent updates, conflict detection and both resolutions, pagination, rate limits, 429/5xx/network/timeout retries, duplicate issue recovery, deletion propagation, and restart/cursor persistence.
+The 16 backend tests cover API CRUD/status codes, duplicate webhooks delivered three times, deleted-task tombstones, stale concurrent updates, conflict detection and both resolutions, pagination, rate limits, 429/5xx/network/timeout retries, duplicate issue recovery, deletion propagation, restart/cursor persistence, and cross-process locking.
 
 ## Submission verification
 
@@ -160,8 +188,10 @@ Do not include `.env`, `node_modules`, `frontend/dist`, or runtime state in a su
 
 The screenshot shows the running dashboard with task counts, Sync now, task creation, search, status filters, and synchronized GitHub-backed tasks.
 
-## Known limitations
+## 15. Known Limitations
 
 The PostgreSQL store keeps an in-memory snapshot for the existing sync engine and persists normalized records in one transaction. `pushPending()` uses a PostgreSQL advisory lock, so separate backend processes cannot process the sync queue at the same time; the in-process `running` guard handles re-entry within one process. The current pull uses GitHub's `since` filter but still needs to scan each changed page; using GitHub events or conditional requests would make large repositories more efficient.
 
-With more time, I would add PostgreSQL integration tests in CI, worker leases for multi-process queue consumers, API pagination for very large local task lists, authentication for dashboard users, structured logging/metrics, and field-level conflict merging. The current design is intentionally explicit about these boundaries rather than claiming multi-worker guarantees it does not provide.
+## 16. Future Improvements
+
+With more time, I would add PostgreSQL integration tests in CI, row-level job leases for more granular queue consumers, API pagination for very large local task lists, authentication for dashboard users, structured logging/metrics, and field-level conflict merging. The current design is intentionally explicit about these boundaries rather than claiming guarantees it does not provide.
