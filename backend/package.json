@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
+    "migrate": "node -e \"require('dotenv').config(); const { Pool } = require('pg'); const { migrate } = require('./migrate'); const pool = new Pool({ connectionString: process.env.DATABASE_URL }); migrate(pool).then(() => pool.end()).then(() => console.log('Migrations applied')).catch((error) => { console.error(error); process.exit(1); })\"",
     "test": "node --test"
   },
   "keywords": [],

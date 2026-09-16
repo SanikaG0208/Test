@@ -1,12 +1,13 @@
 const API_ROOT = 'https://api.github.com';
 
 class GithubProvider {
-  constructor({ token, owner, repo, fetchImpl = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)) } = {}) {
+  constructor({ token, owner, repo, fetchImpl = fetch, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), requestTimeoutMs = Number(process.env.GITHUB_REQUEST_TIMEOUT_MS || 10000) } = {}) {
     this.token = token || process.env.GITHUB_TOKEN;
     this.owner = owner || process.env.GITHUB_OWNER;
     this.repo = repo || process.env.GITHUB_REPO;
     this.fetch = fetchImpl;
     this.sleep = sleep;
+    this.requestTimeoutMs = requestTimeoutMs;
   }
 
   get configured() { return Boolean(this.token && this.owner && this.repo); }
@@ -14,12 +15,16 @@ class GithubProvider {
   async request(path, options = {}, attempt = 0) {
     if (!this.configured) throw new Error('GitHub is not set up yet. Add GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO to the backend .env file.');
     let response;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.requestTimeoutMs);
     try {
-      response = await this.fetch(`${API_ROOT}${path}`, { ...options, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(options.headers || {}) } });
+      response = await this.fetch(`${API_ROOT}${path}`, { ...options, signal: controller.signal, headers: { Accept: 'application/vnd.github+json', Authorization: `Bearer ${this.token}`, 'X-GitHub-Api-Version': '2022-11-28', ...(options.headers || {}) } });
     } catch (error) {
       if (attempt >= 5) throw error;
       await this.sleep(Math.min(30000, 2 ** attempt * 1000));
       return this.request(path, options, attempt + 1);
+    } finally {
+      clearTimeout(timeout);
     }
     const rateLimited = response.status === 429 || (response.status === 403 && response.headers.get('x-ratelimit-remaining') === '0');
     if ((rateLimited || response.status >= 500) && attempt < 5) {

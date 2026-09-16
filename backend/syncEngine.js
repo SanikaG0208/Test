@@ -6,7 +6,8 @@ class SyncEngine {
   constructor(store, provider) { this.store = store; this.provider = provider; this.running = false; }
 
   async createTask(input) {
-    const task = { id: crypto.randomUUID(), title: input.title, description: input.description || '', status: input.status || 'open', version: 1, updatedAt: now(), syncStatus: 'pending', error: null, conflict: null, providerId: null };
+    const timestamp = now();
+    const task = { id: crypto.randomUUID(), title: input.title, description: input.description || '', status: input.status || 'open', version: 1, createdAt: timestamp, updatedAt: timestamp, syncStatus: 'pending', error: null, conflict: null, providerId: null };
     await this.store.update((state) => state.tasks.push(task));
     return task;
   }
